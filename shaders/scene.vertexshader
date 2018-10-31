@@ -18,7 +18,7 @@ uniform mat4 Projection;
 uniform mat4 View;
 
 uniform vec3 Size;
-uniform vec3 MiddleTranslation;
+uniform vec3 MiddleTranslation; //test
 
 vec4 quat_mul(vec4 q1, vec4 q2) {
 	return vec4(
