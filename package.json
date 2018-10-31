@@ -1,0 +1,10 @@
+{
+  "name": "WebEngineTest",
+  "version": "0.0.1",
+  "dependencies": {
+    "gl-matrix": "2.7.1"
+  },
+  "scripts": {
+    "build": "ShaderConverter.exe | browserify main.js -o build/main.js --debug"
+  }
+}

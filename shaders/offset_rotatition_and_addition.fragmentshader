@@ -1,0 +1,54 @@
+precision mediump float;
+
+uniform sampler2D rotations;
+uniform sampler2D parentOffsets;
+uniform vec3 boneOffset;
+
+vec4 color_to_quat(vec4 color) {
+    return color * (255.0 / 127.0) - 1.0;
+}
+
+vec4 quat_mul(vec4 q1, vec4 q2) {
+	return vec4(
+		q2.xyz * q1.w + q1.xyz * q2.w + cross(q1.xyz, q2.xyz),
+		q1.w * q2.w - dot(q1.xyz, q2.xyz)
+	);
+}
+
+vec3 rotate_vector(vec3 v, vec4 r) {
+	vec4 r_c = r * vec4(-1, -1, -1, 1);
+	return quat_mul(r, quat_mul(vec4(v, 0), r_c)).xyz;
+}
+
+vec3 color_to_offset(vec4 color) {
+
+    float len = color.w * 2.0;
+
+    return (color.xyz * (255.0 / 127.0) - 1.0) * len;
+}
+
+vec4 offset_to_color(vec3 offset) {
+
+    float len = length(offset);
+
+    vec4 result;
+    result.xyz = (offset / len + 1.0) * (127.0 / 255.0);
+    result.w = len / 2.0;
+
+    return result;
+}
+
+void main()
+{
+    vec2 currentPosition = vec2(gl_FragCoord.x, gl_FragCoord.y) / 64.0;
+
+    vec4 rotationQ = color_to_quat(texture2D(rotations, currentPosition));
+
+    vec3 rotated_offset = rotate_vector(boneOffset, rotationQ);
+
+    vec3 parent_offset = color_to_offset(texture2D(parentOffsets, currentPosition));
+
+    vec3 result = parent_offset + rotated_offset;
+
+    gl_FragData[0] = offset_to_color(result);
+}
