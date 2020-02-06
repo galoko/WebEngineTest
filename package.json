@@ -2,9 +2,10 @@
   "name": "WebEngineTest",
   "version": "0.0.1",
   "dependencies": {
-    "gl-matrix": "2.7.1",
-    "express": "~4.16.0",
-    "browserify-middleware": "^8.1.1"
+    "gl-matrix": "2.7.1"
+  },
+  "devDependencies": {
+    "browserify-middleware": "latest"
   },
   "scripts": {
     "build": "ShaderConverter.exe | browserify main.js -o build/main.js --debug",
