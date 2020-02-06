@@ -107,7 +107,7 @@ function loadAllResources() {
         return;
 
     state = 1;
-    database = loadJson('/database.json');
+    database = loadJson('database.json');
 }
 
 function getDatabase() {
