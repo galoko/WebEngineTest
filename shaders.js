@@ -1,15 +1,12 @@
 ﻿// shaders start
 
 module.exports.offsetRotatitionAndAdditionFragmentShader = 
-    'precision mediump float;\n' +
+    'precision lowp float;\n' +
+    'precision lowp sampler2D;\n' +
     '\n' +
     'uniform sampler2D rotations;\n' +
     'uniform sampler2D parentOffsets;\n' +
     'uniform vec3 boneOffset;\n' +
-    '\n' +
-    'vec4 color_to_quat(vec4 color) {\n' +
-    '    return color * (255.0 / 127.0) - 1.0;\n' +
-    '}\n' +
     '\n' +
     'vec4 quat_mul(vec4 q1, vec4 q2) {\n' +
     '	return vec4(\n' +
@@ -23,64 +20,40 @@ module.exports.offsetRotatitionAndAdditionFragmentShader =
     '	return quat_mul(r, quat_mul(vec4(v, 0), r_c)).xyz;\n' +
     '}\n' +
     '\n' +
-    'vec3 color_to_offset(vec4 color) {\n' +
-    '\n' +
-    '    float len = color.w * 2.0;\n' +
-    '\n' +
-    '    return (color.xyz * (255.0 / 127.0) - 1.0) * len;\n' +
-    '}\n' +
-    '\n' +
-    'vec4 offset_to_color(vec3 offset) {\n' +
-    '\n' +
-    '    float len = length(offset);\n' +
-    '\n' +
-    '    vec4 result;\n' +
-    '    result.xyz = (offset / len + 1.0) * (127.0 / 255.0);\n' +
-    '    result.w = len / 2.0;\n' +
-    '\n' +
-    '    return result;\n' +
-    '}\n' +
-    '\n' +
     'void main()\n' +
     '{\n' +
     '    vec2 currentPosition = vec2(gl_FragCoord.x, gl_FragCoord.y) / 64.0;\n' +
     '\n' +
-    '    vec4 rotationQ = color_to_quat(texture2D(rotations, currentPosition));\n' +
+    '    vec4 rotationQ = texture2D(rotations, currentPosition);\n' +
     '\n' +
     '    vec3 rotated_offset = rotate_vector(boneOffset, rotationQ);\n' +
     '\n' +
-    '    vec3 parent_offset = color_to_offset(texture2D(parentOffsets, currentPosition));\n' +
+    '    vec3 parent_offset = texture2D(parentOffsets, currentPosition).xyz;\n' +
     '\n' +
     '    vec3 result = parent_offset + rotated_offset;\n' +
     '\n' +
-    '    gl_FragData[0] = offset_to_color(result);\n' +
+    '    gl_FragColor = vec4(result, 1);\n' +
     '}\n';
 
 module.exports.offsetRotatitionAndAdditionVertexShader = 
-    'precision mediump float;\n' +
+    'precision lowp float;\n' +
+    'precision lowp sampler2D;\n' +
     '\n' +
-    'attribute vec3 VertexPosition;\n' +
+    'attribute vec3 vertexPosition;\n' +
     '\n' +
     'void main()\n' +
     '{\n' +
-    '    gl_Position = vec4(VertexPosition, 1.0);\n' +
+    '    gl_Position = vec4(vertexPosition, 1.0);\n' +
     '}\n';
 
 module.exports.quaternionMultiplicationFragmentShader = 
-    'precision mediump float;\n' +
+    'precision lowp float;\n' +
+    'precision lowp sampler2D;\n' +
     '\n' +
-    'uniform sampler2D database;\n' +
+    'uniform sampler2D relativeRotations;\n' +
     'uniform sampler2D instances;\n' +
     'uniform sampler2D parentRotations;\n' +
     'uniform float boneId;\n' +
-    '\n' +
-    'vec4 color_to_quat(vec4 color) {\n' +
-    '    return color * (255.0 / 127.0) - 1.0;\n' +
-    '}\n' +
-    '\n' +
-    'vec4 quat_to_color(vec4 quat) {\n' +
-    '    return (quat + 1.0) * (127.0 / 255.0);\n' +
-    '}\n' +
     '\n' +
     'vec4 quat_mul(vec4 q1, vec4 q2) {\n' +
     '	return vec4(\n' +
@@ -95,80 +68,76 @@ module.exports.quaternionMultiplicationFragmentShader =
     '\n' +
     '    vec4 instanceInfo = texture2D(instances, currentPosition);\n' +
     '\n' +
-    '    float stride = instanceInfo.w * (255.0 / 256.0) + (1.0 / 256.0);\n' +
+    '    float stride = instanceInfo.z;\n' +
     '\n' +
-    '    float database_x =\n' +
-    '        instanceInfo.x * (255.0 / 256.0) + (0.5 / 256.0) + // color to [0, 255] / 256 + center offset\n' +
-    '        instanceInfo.z * (255.0 / 256.0 / 256.0) + // interpolation t\n' +
-    '        stride * boneId;\n' +
-    '    float database_y =\n' +
-    '        instanceInfo.y * (255.0 / 256.0) + (0.5 / 256.0); // color to [0, 255] / 256 + center offset\n' +
+    '    vec2 relativeRotationsPosition = vec2(instanceInfo.x + stride * boneId, instanceInfo.y);\n' +
     '\n' +
-    '    vec2 databasePosition = vec2(database_x, database_y);\n' +
+    '    vec4 relativeRotationQ = texture2D(relativeRotations, relativeRotationsPosition);\n' +
     '\n' +
-    '    vec4 relativeRotationQ = color_to_quat(texture2D(database, databasePosition));\n' +
-    '\n' +
-    '    vec4 parentRotationQ = color_to_quat(texture2D(parentRotations, currentPosition));\n' +
+    '    vec4 parentRotationQ = texture2D(parentRotations, currentPosition);\n' +
     '\n' +
     '    vec4 output_quat = quat_mul(relativeRotationQ, parentRotationQ);\n' +
     '\n' +
-    '    gl_FragData[0] = quat_to_color(output_quat);\n' +
+    '    gl_FragColor = output_quat;\n' +
     '}\n';
 
 module.exports.quaternionMultiplicationVertexShader = 
-    'precision mediump float;\n' +
+    'precision lowp float;\n' +
+    'precision lowp sampler2D;\n' +
     '\n' +
-    'attribute vec3 VertexPosition;\n' +
+    'attribute vec3 vertexPosition;\n' +
     '\n' +
     'void main()\n' +
     '{\n' +
-    '    gl_Position = vec4(VertexPosition, 1.0);\n' +
+    '    gl_Position = vec4(vertexPosition, 1.0);\n' +
     '}\n';
 
 module.exports.sceneFragmentShader = 
-    'precision mediump float;\n' +
+    'precision lowp float;\n' +
+    'precision lowp sampler2D;\n' +
     '\n' +
-    'varying vec3 CameraNormal;\n' +
-    'varying vec3 CameraLightDirection;\n' +
+    'varying vec3 cameraNormal;\n' +
+    'varying vec3 cameraLightDirection;\n' +
     '\n' +
     'void main()\n' +
     '{\n' +
-    '    vec4 MaterialColor = vec4(1, 1, 1, 1);\n' +
+    '    vec4 materialColor = vec4(1, 1, 1, 1);\n' +
     '\n' +
-    '    vec3 Normal = normalize(CameraNormal);\n' +
-    '    vec3 LightDirection = normalize(CameraLightDirection);\n' +
-    '    float cosTheta = clamp(dot(Normal, LightDirection), 0.0, 1.0);\n' +
+    '    vec3 normal = normalize(cameraNormal);\n' +
+    '    vec3 lightDirection = normalize(cameraLightDirection);\n' +
+    '    float cosTheta = clamp(dot(normal, lightDirection), 0.0, 1.0);\n' +
     '\n' +
-    '    vec3 LightAmbientColor = vec3(0.3, 0.3, 0.3);\n' +
-    '    vec3 LightDiffuseColor = vec3(1.0, 1.0, 1.0);\n' +
+    '    vec3 lightAmbientColor = vec3(0.3, 0.3, 0.3);\n' +
+    '    vec3 lightDiffuseColor = vec3(1.0, 1.0, 1.0);\n' +
     '\n' +
     '    gl_FragColor =\n' +
-    '        MaterialColor * vec4(LightAmbientColor, 1) +\n' +
-    '        MaterialColor * vec4(LightDiffuseColor, 1) * cosTheta;\n' +
+    '        materialColor * vec4(lightAmbientColor, 1) +\n' +
+    '        materialColor * vec4(lightDiffuseColor, 1) * cosTheta;\n' +
     '}\n';
 
 module.exports.sceneVertexShader = 
-    'precision mediump float;\n' +
+    'precision lowp float;\n' +
+    'precision lowp sampler2D;\n' +
     '\n' +
-    'attribute vec3 VertexPosition;\n' +
-    'attribute vec3 VertexNormal;\n' +
-    'attribute vec2 InstanceCoord;\n' +
+    'attribute vec3 vertexPosition;\n' +
+    'attribute vec2 texCoord;\n' +
+    'attribute vec3 vertexNormal;\n' +
     '\n' +
-    'varying vec3 CameraNormal;\n' +
-    'varying vec3 CameraLightDirection;\n' +
+    '// per instance attributes\n' +
+    'attribute vec2 instanceCoord;\n' +
+    'attribute vec3 rootPosition;\n' +
     '\n' +
-    'uniform sampler2D Rotations;\n' +
-    'uniform sampler2D Offsets;\n' +
+    'varying vec3 cameraNormal;\n' +
+    'varying vec3 cameraLightDirection;\n' +
     '\n' +
-    'uniform sampler2D PositionsX;\n' +
-    'uniform sampler2D PositionsY;\n' +
-    'uniform sampler2D PositionsZ;\n' +
+    'uniform sampler2D rotations;\n' +
+    'uniform sampler2D offsets;\n' +
     '\n' +
-    'uniform mat4 Projection;\n' +
-    'uniform mat4 View;\n' +
+    'uniform mat4 projection;\n' +
+    'uniform mat4 view;\n' +
     '\n' +
-    'uniform vec3 Size;\n' +
-    'uniform vec3 MiddleTranslation;\n' +
+    'uniform vec3 size;\n' +
+    'uniform vec3 middleTranslation;\n' +
     '\n' +
     'vec4 quat_mul(vec4 q1, vec4 q2) {\n' +
     '	return vec4(\n' +
@@ -182,58 +151,25 @@ module.exports.sceneVertexShader =
     '	return quat_mul(r, quat_mul(vec4(v, 0), r_c)).xyz;\n' +
     '}\n' +
     '\n' +
-    'vec4 color_to_quat(vec4 color) {\n' +
-    '    return color * (255.0 / 127.0) - 1.0;\n' +
-    '}\n' +
-    '\n' +
-    'vec3 color_to_offset(vec4 color) {\n' +
-    '\n' +
-    '    float len = color.w * 2.0;\n' +
-    '\n' +
-    '    return (color.xyz * (255.0 / 127.0) - 1.0) * len;\n' +
-    '}\n' +
-    '\n' +
-    '#define precision 1000.0\n' +
-    '\n' +
-    'float color_to_float(vec4 color) {\n' +
-    '\n' +
-    '  return\n' +
-    '    (\n' +
-    '    color.r * (255.0 / precision) +\n' +
-    '    color.g * (256.0 * 255.0 / precision) +\n' +
-    '    color.b * (256.0 * 256.0 * 255.0 / precision)\n' +
-    '    ) * (color.a * 2.0 - 1.0);\n' +
-    '}\n' +
-    '\n' +
-    'vec3 get_position(vec2 coord) {\n' +
-    '\n' +
-    '    return vec3\n' +
-    '    (\n' +
-    '        color_to_float(texture2D(PositionsX, coord)),\n' +
-    '        color_to_float(texture2D(PositionsY, coord)),\n' +
-    '        color_to_float(texture2D(PositionsZ, coord))\n' +
-    '    );\n' +
-    '}\n' +
-    '\n' +
     'void main()\n' +
     '{\n' +
-    '    vec4 Rotation = color_to_quat(texture2D(Rotations, InstanceCoord));\n' +
+    '    vec4 rotation = texture2D(rotations, instanceCoord);\n' +
     '\n' +
-    '    vec3 RootPosition = get_position(InstanceCoord);\n' +
-    '    vec3 Offset = color_to_offset(texture2D(Offsets, InstanceCoord));\n' +
+    '    vec3 offset = texture2D(offsets, instanceCoord).xyz;\n' +
     '\n' +
-    '    vec3 Position = RootPosition + Offset;\n' +
+    '    vec3 position = rootPosition + offset;\n' +
     '\n' +
-    '    vec3 WorldVertexPosition = rotate_vector(VertexPosition * Size + MiddleTranslation, Rotation) + Position;\n' +
+    '    vec3 worldVertexPosition = rotate_vector(vertexPosition * size + middleTranslation, rotation) + position;\n' +
     '\n' +
-    '    gl_Position = Projection * View * vec4(WorldVertexPosition, 1);\n' +
+    '    gl_Position = projection * view * vec4(worldVertexPosition, 1);\n' +
     '\n' +
-    '    CameraLightDirection = -(View * vec4(WorldVertexPosition, 1)).xyz;\n' +
-    '    CameraNormal = (View * vec4(rotate_vector(VertexNormal, Rotation), 0)).xyz;\n' +
+    '    cameraLightDirection = -(view * vec4(worldVertexPosition, 1)).xyz;\n' +
+    '    cameraNormal = (view * vec4(rotate_vector(vertexNormal, rotation), 0)).xyz;\n' +
     '}\n';
 
 module.exports.textureOutputFragmentShader = 
-    'precision mediump float;\n' +
+    'precision lowp float;\n' +
+    'precision lowp sampler2D;\n' +
     '\n' +
     'uniform sampler2D inputTex;\n' +
     'uniform float invOutputSize;\n' +
@@ -242,18 +178,19 @@ module.exports.textureOutputFragmentShader =
     '{\n' +
     '    vec2 currentPosition = vec2(gl_FragCoord.x, gl_FragCoord.y) * invOutputSize;\n' +
     '\n' +
-    '    // gl_FragColor = vec4(texture2D(inputTex, currentPosition).a, 0, 0, 1); // r = aplha\n' +
     '    gl_FragColor = vec4(texture2D(inputTex, currentPosition).rgb, 1);\n' +
+    '    // gl_FragColor = vec4(texture2D(inputTex, currentPosition).a, 0, 0, 1); // r = aplha\n' +
     '}\n';
 
 module.exports.textureOutputVertexShader = 
-    'precision mediump float;\n' +
+    'precision lowp float;\n' +
+    'precision lowp sampler2D;\n' +
     '\n' +
-    'attribute vec3 VertexPosition;\n' +
+    'attribute vec3 vertexPosition;\n' +
     '\n' +
     'void main()\n' +
     '{\n' +
-    '    gl_Position = vec4(VertexPosition, 1.0);\n' +
+    '    gl_Position = vec4(vertexPosition, 1.0);\n' +
     '}\n';
 
 // shaders end

@@ -1,20 +1,21 @@
-precision mediump float;
+precision lowp float;
+precision lowp sampler2D;
 
-varying vec3 CameraNormal;
-varying vec3 CameraLightDirection;
+varying vec3 cameraNormal;
+varying vec3 cameraLightDirection;
 
 void main()
 {
-    vec4 MaterialColor = vec4(1, 1, 1, 1);
+    vec4 materialColor = vec4(1, 1, 1, 1);
 
-    vec3 Normal = normalize(CameraNormal);
-    vec3 LightDirection = normalize(CameraLightDirection);
-    float cosTheta = clamp(dot(Normal, LightDirection), 0.0, 1.0);
+    vec3 normal = normalize(cameraNormal);
+    vec3 lightDirection = normalize(cameraLightDirection);
+    float cosTheta = clamp(dot(normal, lightDirection), 0.0, 1.0);
 
-    vec3 LightAmbientColor = vec3(0.3, 0.3, 0.3);
-    vec3 LightDiffuseColor = vec3(1.0, 1.0, 1.0);
+    vec3 lightAmbientColor = vec3(0.3, 0.3, 0.3);
+    vec3 lightDiffuseColor = vec3(1.0, 1.0, 1.0);
 
     gl_FragColor =
-        MaterialColor * vec4(LightAmbientColor, 1) +
-        MaterialColor * vec4(LightDiffuseColor, 1) * cosTheta;
+        materialColor * vec4(lightAmbientColor, 1) +
+        materialColor * vec4(lightDiffuseColor, 1) * cosTheta;
 }

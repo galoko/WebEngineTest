@@ -1,19 +1,98 @@
 ﻿const shaders = require("./shaders.js");
-const RawData = require("./raw_data");
+const RawData = require("./raw-data");
 
 let gl;
+let ANGLE;
 let screenWidth, screenHeight;
 
-function initialize(_gl) {
+function initialize() {
 
-    gl = _gl;
+    const success =
+        setupGL() &&
+        setupExtensions() &&
+        setupStaticSettings() &&
+        compileShaders() &&
+        setupPrimitives();
 
-    // var ext = gl.getExtension("ANGLE_instanced_arrays"); // Vendor prefixes may apply!
-    // alert(ext);
+    return success;
+}
 
-    setupStaticSettings();
-    compileShaders();
-    setupPrimitives();
+function glEnumToString(gl, value) {
+    // Optimization for the most common enum:
+    if (value === gl.NO_ERROR) {
+        return "NO_ERROR";
+    }
+    for (const p in gl) {
+        if (gl[p] === value) {
+            return p;
+        }
+    }
+    return "0x" + value.toString(16);
+}
+
+function createGLErrorWrapper(context, fname) {
+    return function() {
+        const rv = context[fname].apply(context, arguments);
+        const err = context.getError();
+        if (err !== context.NO_ERROR)
+            throw "GL error " + glEnumToString(context, err) + " in " + fname;
+        return rv;
+    };
+}
+
+function create3DContextWithWrapperThatThrowsOnGLError(context) {
+
+    const wrap = {};
+    for (const i in context) {
+        try {
+            if (typeof context[i] === 'function') {
+                wrap[i] = createGLErrorWrapper(context, i);
+            } else {
+                wrap[i] = context[i];
+            }
+        } catch (e) {
+            error("createContextWrapperThatThrowsOnGLError: Error accessing " + i);
+        }
+    }
+    wrap.getError = function() {
+        return context.getError();
+    };
+    return wrap;
+}
+
+function setupGL() {
+
+    const canvas = document.getElementById('game-surface');
+
+    gl = canvas.getContext('webgl');
+    if (!gl)
+        gl = canvas.getContext('experimental-webgl');
+
+    if (!gl)
+        return false;
+
+    // gl = create3DContextWithWrapperThatThrowsOnGLError(gl);
+
+    return true;
+}
+
+function getGL() {
+    return gl;
+}
+
+function setupExtensions() {
+
+    ANGLE = gl.getExtension("ANGLE_instanced_arrays");
+    if (!ANGLE)
+        return false;
+
+    if (!gl.getExtension("OES_texture_float"))
+        return false;
+
+    if (!gl.getExtension("OES_texture_float_linear"))
+        return false;
+
+    return true;
 }
 
 function setScreenSize(width, height) {
@@ -30,66 +109,33 @@ function setupStaticSettings() {
     gl.enable(gl.CULL_FACE);
     gl.frontFace(gl.CCW);
     gl.cullFace(gl.BACK);
+
+    return true;
 }
 
 let frameBuffer;
+let primitivesBuffer, instanceCoordsBuffer, positionsBuffer;
 let screenTriangleStart, screenTriangleSize, cubeStart, cubeSize;
-
-function checkGLError() {
-
-    const error = gl.getError();
-    if (error !== gl.NO_ERROR)
-        alert("WebGL Error: " + error);
-}
-
-function writeData(srcData, srcPosition, srcCount, dstData, dstPosition, instanceX, instanceY) {
-
-    for (let i = 0; i < srcCount; i++) {
-
-        for (let j = 0; j < 6; j++)
-            dstData[dstPosition++] = srcData[srcPosition++];
-
-        dstData[dstPosition++] = instanceX;
-        dstData[dstPosition++] = instanceY;
-    }
-
-    return dstPosition;
-}
 
 function setupPrimitives() {
 
     frameBuffer = gl.createFramebuffer();
 
-    const texSize = 64;
-    const bufferStride = 8;
-    const templateData = RawData.data;
-    const data = new Float32Array((RawData.screenTriangleSize + RawData.cubeSize * texSize * texSize) * bufferStride);
+    const data = new Float32Array(RawData.data);
 
-    let position = 0;
-
-    screenTriangleStart = position / bufferStride;
+    screenTriangleStart = RawData.screenTriangleStart;
     screenTriangleSize = RawData.screenTriangleSize;
-    position = writeData(templateData, RawData.screenTriangleStart * 6, screenTriangleSize, data, position, 0, 0);
 
-    cubeStart = position / bufferStride;
+    cubeStart = RawData.cubeStart;
     cubeSize = RawData.cubeSize;
 
-    for (let y = 0; y < texSize; y++)
-        for (let x = 0; x < texSize; x++) {
-
-            const instanceX = (x / texSize) + (0.5 / texSize);
-            const instanceY = (y / texSize) + (0.5 / texSize);
-
-            position = writeData(templateData, RawData.cubeStart * 6, cubeSize, data, position, instanceX, instanceY);
-        }
-
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    primitivesBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, primitivesBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
 
     let index;
 
-    index = gl.getAttribLocation(sceneShader.program, "VertexPosition");
+    index = gl.getAttribLocation(sceneShader.program, "vertexPosition");
     gl.enableVertexAttribArray(index);
     gl.vertexAttribPointer(
         index,
@@ -100,7 +146,21 @@ function setupPrimitives() {
         0
     );
 
-    index = gl.getAttribLocation(sceneShader.program, "VertexNormal");
+    index = gl.getAttribLocation(sceneShader.program, "texCoord");
+    // remove this when texCoord wouldn't be optimized away (e.g. will be used)
+    if (index !== -1) {
+        gl.enableVertexAttribArray(index);
+        gl.vertexAttribPointer(
+            index,
+            2,
+            gl.FLOAT,
+            gl.FALSE,
+            8 * Float32Array.BYTES_PER_ELEMENT,
+            3 * Float32Array.BYTES_PER_ELEMENT
+        );
+    }
+
+    index = gl.getAttribLocation(sceneShader.program, "vertexNormal");
     gl.enableVertexAttribArray(index);
     gl.vertexAttribPointer(
         index,
@@ -108,19 +168,40 @@ function setupPrimitives() {
         gl.FLOAT,
         gl.FALSE,
         8 * Float32Array.BYTES_PER_ELEMENT,
-        3 * Float32Array.BYTES_PER_ELEMENT
+        5 * Float32Array.BYTES_PER_ELEMENT
     );
 
-    index = gl.getAttribLocation(sceneShader.program, "InstanceCoord");
+    instanceCoordsBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, instanceCoordsBuffer);
+
+    index = gl.getAttribLocation(sceneShader.program, "instanceCoord");
     gl.enableVertexAttribArray(index);
     gl.vertexAttribPointer(
         index,
         2,
         gl.FLOAT,
         gl.FALSE,
-        8 * Float32Array.BYTES_PER_ELEMENT,
-        6 * Float32Array.BYTES_PER_ELEMENT
+        2 * Float32Array.BYTES_PER_ELEMENT,
+        0
     );
+    ANGLE.vertexAttribDivisorANGLE(index, 1);
+
+    positionsBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionsBuffer);
+
+    index = gl.getAttribLocation(sceneShader.program, "rootPosition");
+    gl.enableVertexAttribArray(index);
+    gl.vertexAttribPointer(
+        index,
+        3,
+        gl.FLOAT,
+        gl.FALSE,
+        3 * Float32Array.BYTES_PER_ELEMENT,
+        0
+    );
+    ANGLE.vertexAttribDivisorANGLE(index, 1);
+
+    return true;
 }
 
 // shared
@@ -132,10 +213,10 @@ function compileShaders() {
     // quaternion multiplication
 
     quatMulShader = compileShader("quaternion multiplication", shaders.quaternionMultiplicationVertexShader,
-        shaders.quaternionMultiplicationFragmentShader, ['database', 'instances', 'parentRotations', 'boneId']);
+        shaders.quaternionMultiplicationFragmentShader, ['relativeRotations', 'instances', 'parentRotations', 'boneId']);
 
     quatMulShader.use();
-    gl.uniform1i(quatMulShader.database, 0);
+    gl.uniform1i(quatMulShader.relativeRotations, 0);
     gl.uniform1i(quatMulShader.instances, 1);
     gl.uniform1i(quatMulShader.parentRotations, 2);
 
@@ -151,14 +232,11 @@ function compileShaders() {
     // scene
 
     sceneShader = compileShader("scene", shaders.sceneVertexShader, shaders.sceneFragmentShader,
-        ['Rotations', 'Offsets', 'PositionsX', 'PositionsY', 'PositionsZ', 'Projection', 'View', 'Size', 'MiddleTranslation']);
+        ['rotations', 'offsets', 'projection', 'view', 'size', 'middleTranslation']);
 
     sceneShader.use();
-    gl.uniform1i(sceneShader.Rotations, 0);
-    gl.uniform1i(sceneShader.Offsets, 1);
-    gl.uniform1i(sceneShader.PositionsX, 2);
-    gl.uniform1i(sceneShader.PositionsY, 3);
-    gl.uniform1i(sceneShader.PositionsZ, 4);
+    gl.uniform1i(sceneShader.rotations, 0);
+    gl.uniform1i(sceneShader.offsets, 1);
 
     // texture output
 
@@ -167,6 +245,8 @@ function compileShaders() {
 
     texOutputShader.use();
     gl.uniform1i(texOutputShader.inputTex, 0);
+
+    return true;
 }
 
 // render utils
@@ -194,7 +274,7 @@ function setupRenderToFrontBuffer() {
 
 // specific render modes
 
-function computeQuats(boneId, database, instances, parentRotations, outputRotations) {
+function computeQuats(boneId, relativeRotations, instances, parentRotations, outputRotations) {
 
     quatMulShader.use();
 
@@ -204,7 +284,7 @@ function computeQuats(boneId, database, instances, parentRotations, outputRotati
     gl.uniform1f(quatMulShader.boneId, boneId);
 
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, database);
+    gl.bindTexture(gl.TEXTURE_2D, relativeRotations);
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, instances);
     gl.activeTexture(gl.TEXTURE2);
@@ -239,40 +319,40 @@ function clear() {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 }
 
-function setupScene(Projection, View) {
+function setupScene(projection, view) {
 
     sceneShader.use();
 
     setup3DRender();
     setupRenderToFrontBuffer();
 
-    gl.uniformMatrix4fv(sceneShader.Projection, gl.FALSE, Projection);
-    gl.uniformMatrix4fv(sceneShader.View, gl.FALSE, View);
+    gl.uniformMatrix4fv(sceneShader.projection, gl.FALSE, projection);
+    gl.uniformMatrix4fv(sceneShader.view, gl.FALSE, view);
 
     clear();
 }
 
-function setupPositions(X, Y, Z) {
-
-    gl.activeTexture(gl.TEXTURE2);
-    gl.bindTexture(gl.TEXTURE_2D, X);
-    gl.activeTexture(gl.TEXTURE3);
-    gl.bindTexture(gl.TEXTURE_2D, Y);
-    gl.activeTexture(gl.TEXTURE4);
-    gl.bindTexture(gl.TEXTURE_2D, Z);
+function setupInstanceCoords(data) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, instanceCoordsBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
 }
 
-function drawInstances(Rotations, Offsets, Size, MiddleTranslation, InstancesCount) {
+function setupPositions(data) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionsBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+}
+
+function drawInstances(rotations, offsets, size, middleTranslation, instancesCount) {
 
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, Rotations);
+    gl.bindTexture(gl.TEXTURE_2D, rotations);
     gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, Offsets);
+    gl.bindTexture(gl.TEXTURE_2D, offsets);
 
-    gl.uniform3fv(sceneShader.Size, Size);
-    gl.uniform3fv(sceneShader.MiddleTranslation, MiddleTranslation);
+    gl.uniform3fv(sceneShader.size, size);
+    gl.uniform3fv(sceneShader.middleTranslation, middleTranslation);
 
-    gl.drawArrays(gl.TRIANGLES, cubeStart, cubeSize * InstancesCount);
+    ANGLE.drawArraysInstancedANGLE(gl.TRIANGLES, cubeStart, cubeSize, instancesCount);
 }
 
 function drawTexture(tex) {
@@ -340,11 +420,13 @@ function compileShader(name, vertexShaderCode, fragmentShaderCode, uniforms) {
 }
 
 module.exports.initialize = initialize;
+module.exports.getGL = getGL;
 module.exports.setScreenSize = setScreenSize;
 module.exports.getAspectRatio = getAspectRatio;
 module.exports.computeQuats = computeQuats;
 module.exports.computeOffsets = computeOffsets;
 module.exports.setupScene = setupScene;
+module.exports.setupInstanceCoords = setupInstanceCoords;
 module.exports.setupPositions = setupPositions;
 module.exports.drawInstances = drawInstances;
 module.exports.drawTexture = drawTexture;

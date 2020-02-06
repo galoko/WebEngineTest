@@ -63,10 +63,10 @@ function arrayToVec3(a) {
 
 Character.prototype.generateBone = function (parent, tail, size, offset, name) {
 
-    const CmToMeters = 0.01;
+    const cmToMeters = 0.01;
 
     const sizeInMeters = vec3.create();
-    vec3.mul(sizeInMeters, arrayToVec3(size), vec3.fromValues(CmToMeters, CmToMeters, CmToMeters));
+    vec3.mul(sizeInMeters, arrayToVec3(size), vec3.fromValues(cmToMeters, cmToMeters, cmToMeters));
 
     const result = new Bone(this.nextBoneID++, name, arrayToVec3(offset), arrayToVec3(tail), sizeInMeters, parent);
 
@@ -121,6 +121,18 @@ Character.prototype.generateBones = function () {
     const hand = this.generateBone(lowerArm, [ 0, 1, 0 ], [ 3.5, 15, 1.5 ], [ 0, 1, 0 ], "Hand");
 
     this.generateRightSide(upperArm, upperArm.parent);
+};
+
+Character.prototype.getBoneIdByName = function (name) {
+
+    const bone = this.bones.get(name);
+
+    return (bone ? bone.id : -1);
+};
+
+Character.prototype.getBoneCount = function () {
+
+    return this.bones.size;
 };
 
 module.exports.Character = Character;

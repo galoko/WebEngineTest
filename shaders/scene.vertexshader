@@ -1,24 +1,25 @@
-precision mediump float;
+precision lowp float;
+precision lowp sampler2D;
 
-attribute vec3 VertexPosition;
-attribute vec3 VertexNormal;
-attribute vec2 InstanceCoord;
+attribute vec3 vertexPosition;
+attribute vec2 texCoord;
+attribute vec3 vertexNormal;
 
-varying vec3 CameraNormal;
-varying vec3 CameraLightDirection;
+// per instance attributes
+attribute vec2 instanceCoord;
+attribute vec3 rootPosition;
 
-uniform sampler2D Rotations;
-uniform sampler2D Offsets;
+varying vec3 cameraNormal;
+varying vec3 cameraLightDirection;
 
-uniform sampler2D PositionsX;
-uniform sampler2D PositionsY;
-uniform sampler2D PositionsZ;
+uniform sampler2D rotations;
+uniform sampler2D offsets;
 
-uniform mat4 Projection;
-uniform mat4 View;
+uniform mat4 projection;
+uniform mat4 view;
 
-uniform vec3 Size;
-uniform vec3 MiddleTranslation; //test
+uniform vec3 size;
+uniform vec3 middleTranslation;
 
 vec4 quat_mul(vec4 q1, vec4 q2) {
 	return vec4(
@@ -32,52 +33,18 @@ vec3 rotate_vector(vec3 v, vec4 r) {
 	return quat_mul(r, quat_mul(vec4(v, 0), r_c)).xyz;
 }
 
-vec4 color_to_quat(vec4 color) {
-    return color * (255.0 / 127.0) - 1.0;
-}
-
-vec3 color_to_offset(vec4 color) {
-
-    float len = color.w * 2.0;
-
-    return (color.xyz * (255.0 / 127.0) - 1.0) * len;
-}
-
-#define precision 1000.0
-
-float color_to_float(vec4 color) {
-
-  return
-    (
-    color.r * (255.0 / precision) +
-    color.g * (256.0 * 255.0 / precision) +
-    color.b * (256.0 * 256.0 * 255.0 / precision)
-    ) * (color.a * 2.0 - 1.0);
-}
-
-vec3 get_position(vec2 coord) {
-
-    return vec3
-    (
-        color_to_float(texture2D(PositionsX, coord)),
-        color_to_float(texture2D(PositionsY, coord)),
-        color_to_float(texture2D(PositionsZ, coord))
-    );
-}
-
 void main()
 {
-    vec4 Rotation = color_to_quat(texture2D(Rotations, InstanceCoord));
+    vec4 rotation = texture2D(rotations, instanceCoord);
 
-    vec3 RootPosition = get_position(InstanceCoord);
-    vec3 Offset = color_to_offset(texture2D(Offsets, InstanceCoord));
+    vec3 offset = texture2D(offsets, instanceCoord).xyz;
 
-    vec3 Position = RootPosition + Offset;
+    vec3 position = rootPosition + offset;
 
-    vec3 WorldVertexPosition = rotate_vector(VertexPosition * Size + MiddleTranslation, Rotation) + Position;
+    vec3 worldVertexPosition = rotate_vector(vertexPosition * size + middleTranslation, rotation) + position;
 
-    gl_Position = Projection * View * vec4(WorldVertexPosition, 1);
+    gl_Position = projection * view * vec4(worldVertexPosition, 1);
 
-    CameraLightDirection = -(View * vec4(WorldVertexPosition, 1)).xyz;
-    CameraNormal = (View * vec4(rotate_vector(VertexNormal, Rotation), 0)).xyz;
+    cameraLightDirection = -(view * vec4(worldVertexPosition, 1)).xyz;
+    cameraNormal = (view * vec4(rotate_vector(vertexNormal, rotation), 0)).xyz;
 }

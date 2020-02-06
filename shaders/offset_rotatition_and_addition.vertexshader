@@ -1,8 +1,9 @@
-precision mediump float;
+precision lowp float;
+precision lowp sampler2D;
 
-attribute vec3 VertexPosition;
+attribute vec3 vertexPosition;
 
 void main()
 {
-    gl_Position = vec4(VertexPosition, 1.0);
+    gl_Position = vec4(vertexPosition, 1.0);
 }

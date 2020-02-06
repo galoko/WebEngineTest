@@ -1,0 +1,97 @@
+﻿program ShaderConverter;
+
+uses
+  System.SysUtils, System.Classes, System.IOUtils;
+
+function ToCamelCase(const S: String) : String;
+var
+  Values: TArray<String>;
+  Index: Integer;
+begin
+  Values:= S.Split(['_']);
+
+  for Index := 1 to Length(Values) - 1 do
+    Values[Index]:= String(Values[Index][1]).ToUpperInvariant + Copy(Values[Index], 2);
+
+  Result:= String.Join('', Values);
+end;
+
+procedure FormatShaderContent(Content: TStringList);
+var
+  Index: Integer;
+begin
+  for Index := 0 to Content.Count - 2 do
+    Content[Index]:= Format('    ''%s\n'' +', [Content[Index]]);
+
+  Index:= Content.Count - 1;
+  Content[Index]:= Format('    ''%s\n'';', [Content[Index]]);
+end;
+
+procedure Main;
+const
+  ShaderBlockStart = '// shaders start';
+  ShaderBlockEnd = '// shaders end';
+  SourceFile = 'render.js';
+var
+  ShaderFiles: TArray<String>;
+  ShaderFile, Ext: String;
+  IsVertex, IsFragment: Boolean;
+  VariableName, VariablePostFix: String;
+
+  JavascriptShaderText: String;
+  ShaderContent, JavascriptContent: TStringList;
+  Content: String;
+  StartPos, EndPos: Integer;
+begin
+  ShaderContent:= TStringList.Create;
+
+  JavascriptShaderText:= '';
+
+  ShaderFiles:= TArray<String>(TDirectory.GetFiles('shaders', '*', TSearchOption.soTopDirectoryOnly));
+
+  for ShaderFile in ShaderFiles do
+  begin
+    VariableName:= ToCamelCase(ChangeFileExt(ExtractFileName(ShaderFile), ''));
+
+    Ext:= ExtractFileExt(ShaderFile);
+
+    IsVertex:= Ext = '.vertexshader';
+    IsFragment:= Ext = '.fragmentshader';
+
+    if IsVertex then
+      VariablePostFix:= 'VertexShader'
+    else
+    if IsFragment then
+      VariablePostFix:= 'FragmentShader'
+    else
+      Continue;
+
+    VariableName:= VariableName + VariablePostFix;
+
+    ShaderContent.LoadFromFile(ShaderFile, TEncoding.UTF8);
+
+    FormatShaderContent(ShaderContent);
+
+    JavascriptShaderText:= JavascriptShaderText +
+      Format('var %s = ', [VariableName]) + sLineBreak +
+      ShaderContent.Text + sLineBreak;
+  end;
+
+  JavascriptContent:= TStringList.Create;
+  JavascriptContent.LoadFromFile(SourceFile, TEncoding.UTF8);
+  Content:= JavascriptContent.Text;
+  StartPos:= Pos(ShaderBlockStart, Content);
+  EndPos:= Pos(ShaderBlockEnd, Content);
+  if (StartPos = 0) or (EndPos = 0) then
+    Exit;
+
+  Delete(Content, StartPos, EndPos - StartPos);
+  Insert(ShaderBlockStart + sLineBreak + sLineBreak + JavascriptShaderText, Content, StartPos);
+
+  JavascriptContent.Text:= Content;
+  JavascriptContent.SaveToFile(SourceFile, TEncoding.UTF8);
+end;
+
+begin
+  Main;
+end.

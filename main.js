@@ -1,34 +1,47 @@
 ﻿const Render = require("./render.js");
-const ResourceLoader = require("./resource_loader.js");
-const AnimationManager = require("./animation_manager");
-
-let gl;
+const ResourceLoader = require("./resource-loader.js");
+const AnimationManager = require("./animation-manager");
 
 const fps = 60;
 const fpsInterval = 1000 / fps;
 const dt = 1.0 / fps;
 
 let lastFrameTime = 0;
+let lastFPSUpdateTime = 0;
+let currentFPS = 0;
 
 function tick() {
 
     const now = Date.now();
-    const elapsed = now - lastFrameTime;
 
-    if (elapsed > fpsInterval) {
+    const elapsedSinceLastFrame = now - lastFrameTime;
+    if (elapsedSinceLastFrame >= fpsInterval || true) {
 
-        lastFrameTime = now - (elapsed % fpsInterval);
+        lastFrameTime = now - (elapsedSinceLastFrame % fpsInterval);
 
         AnimationManager.advance(dt);
         AnimationManager.drawAnimations();
+
+        currentFPS++;
     }
+
+    const fpsUpdateInterval = 1000;
+    const elapsedSinceLastFPSUpdate = now - lastFPSUpdateTime;
+    if (elapsedSinceLastFPSUpdate >= fpsUpdateInterval) {
+
+        lastFPSUpdateTime = now - (elapsedSinceLastFPSUpdate % fpsUpdateInterval);
+
+        document.title = currentFPS + " FPS";
+
+        currentFPS = 0;
+    }
+
+    window.requestAnimationFrame(tick);
 }
 
 function loaded() {
 
     const canvas = document.getElementById("game-surface");
-
-    Render.initialize(gl);
     Render.setScreenSize(canvas.width, canvas.height);
 
     AnimationManager.initialize();
@@ -42,29 +55,15 @@ function loaded() {
             instance.setAnimation("new_walk");
         }
 
-    setInterval(tick, 0);
+    // setInterval(tick, 0);
+    window.requestAnimationFrame(tick);
 }
 
-function setupWebGL() {
-
-    const canvas = document.getElementById('game-surface');
-    gl = canvas.getContext('webgl');
-
-    if (!gl) {
-        console.log('WebGL not supported, falling back on experimental-webgl');
-        gl = canvas.getContext('experimental-webgl');
-    }
-
-    if (!gl) {
-        alert('Your browser does not support WebGL');
-        return;
-    }
-
-    // alert(gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS));
-
-    // TODO show some loading screen
-
-    ResourceLoader.initialize(gl, loaded);
+if (!Render.initialize()) {
+    // TODO show message about not being able to draw
+    return;
 }
 
-setupWebGL();
+// TODO show some loading screen
+
+ResourceLoader.initialize(loaded);

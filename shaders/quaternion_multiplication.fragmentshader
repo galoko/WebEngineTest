@@ -1,17 +1,10 @@
-precision mediump float;
+precision lowp float;
+precision lowp sampler2D;
 
-uniform sampler2D database;
+uniform sampler2D relativeRotations;
 uniform sampler2D instances;
 uniform sampler2D parentRotations;
 uniform float boneId;
-
-vec4 color_to_quat(vec4 color) {
-    return color * (255.0 / 127.0) - 1.0;
-}
-
-vec4 quat_to_color(vec4 quat) {
-    return (quat + 1.0) * (127.0 / 255.0);
-}
 
 vec4 quat_mul(vec4 q1, vec4 q2) {
 	return vec4(
@@ -26,22 +19,15 @@ void main()
 
     vec4 instanceInfo = texture2D(instances, currentPosition);
 
-    float stride = instanceInfo.w * (255.0 / 256.0) + (1.0 / 256.0);
+    float stride = instanceInfo.z;
 
-    float database_x =
-        instanceInfo.x * (255.0 / 256.0) + (0.5 / 256.0) + // color to [0, 255] / 256 + center offset
-        instanceInfo.z * (255.0 / 256.0 / 256.0) + // interpolation t
-        stride * boneId;
-    float database_y =
-        instanceInfo.y * (255.0 / 256.0) + (0.5 / 256.0); // color to [0, 255] / 256 + center offset
+    vec2 relativeRotationsPosition = vec2(instanceInfo.x + stride * boneId, instanceInfo.y);
 
-    vec2 databasePosition = vec2(database_x, database_y);
+    vec4 relativeRotationQ = texture2D(relativeRotations, relativeRotationsPosition);
 
-    vec4 relativeRotationQ = color_to_quat(texture2D(database, databasePosition));
-
-    vec4 parentRotationQ = color_to_quat(texture2D(parentRotations, currentPosition));
+    vec4 parentRotationQ = texture2D(parentRotations, currentPosition);
 
     vec4 output_quat = quat_mul(relativeRotationQ, parentRotationQ);
 
-    gl_FragData[0] = quat_to_color(output_quat);
+    gl_FragColor = output_quat;
 }

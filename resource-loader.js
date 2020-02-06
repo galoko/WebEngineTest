@@ -1,10 +1,13 @@
-﻿let state = 0;
+﻿const Render = require("./render.js");
+
+let state = 0;
 let doneCallback;
 let gl;
 
-function initialize(_gl, callback) {
+function initialize(callback) {
 
-    gl = _gl;
+    gl = Render.getGL();
+
     doneCallback = callback;
 
     loadAllResources();
@@ -41,15 +44,15 @@ function loadTexture(url, nearest) {
     return tex;
 }
 
-function createTexture(size, nearest) {
-    return createTextureWithData(size, nearest, null);
+function createTexture(size, nearest, float, renderable) {
+    return createTextureWithData(size, nearest, float, renderable, null);
 }
 
-function createTextureWithData(size, nearest, pixels) {
+function createTextureWithData(size, nearest, float, renderable, pixels) {
 
     const tex = gl.createTexture();
 
-    updateTexture(tex, size, pixels);
+    updateTexture(tex, size, float, renderable, pixels);
 
     setupTextureFiltering(tex, nearest);
 
@@ -72,9 +75,9 @@ function setupTextureFiltering(tex, nearest) {
     }
 }
 
-function updateTexture(tex, size, pixels) {
+function updateTexture(tex, size, float, renderable, pixels) {
     gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, size, size, 0, gl.RGBA, float ? gl.FLOAT : gl.UNSIGNED_BYTE, pixels);
 }
 
 function loadJson(url) {
@@ -96,25 +99,19 @@ function loadJson(url) {
     return json;
 }
 
-let database, databaseMap;
+let database;
 
 function loadAllResources() {
 
     if (state !== 0)
         return;
 
-    state = 2;
-
-    database = loadTexture('/WebEngineTest/build/database.png', false);
-    databaseMap = loadJson('/WebEngineTest/build/database_map.json');
+    state = 1;
+    database = loadJson('/database.json');
 }
 
 function getDatabase() {
     return database;
-}
-
-function getDatabaseMap() {
-    return databaseMap;
 }
 
 module.exports.initialize = initialize;
@@ -122,4 +119,3 @@ module.exports.createTexture = createTexture;
 module.exports.createTextureWithData = createTextureWithData;
 module.exports.updateTexture = updateTexture;
 module.exports.getDatabase = getDatabase;
-module.exports.getDatabaseMap = getDatabaseMap;

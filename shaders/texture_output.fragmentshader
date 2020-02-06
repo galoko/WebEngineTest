@@ -1,4 +1,5 @@
-precision mediump float;
+precision lowp float;
+precision lowp sampler2D;
 
 uniform sampler2D inputTex;
 uniform float invOutputSize;
@@ -7,6 +8,6 @@ void main()
 {
     vec2 currentPosition = vec2(gl_FragCoord.x, gl_FragCoord.y) * invOutputSize;
 
-    // gl_FragColor = vec4(texture2D(inputTex, currentPosition).a, 0, 0, 1); // r = aplha
     gl_FragColor = vec4(texture2D(inputTex, currentPosition).rgb, 1);
+    // gl_FragColor = vec4(texture2D(inputTex, currentPosition).a, 0, 0, 1); // r = aplha
 }
